@@ -1,5 +1,10 @@
 import { Module } from "@nestjs/common";
+import { McpController } from "./mcp.controller";
+import { McpService } from "./mcp.service";
 
-// TODO: implement in Step 2
-@Module({})
+@Module({
+  controllers: [McpController],
+  providers: [McpService],
+  exports: [McpService],
+})
 export class McpModule {}

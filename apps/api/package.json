@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "nest build",
-    "dev": "tsx watch src/main.ts",
+    "dev": "node --require @swc/register src/main.ts",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit"
   },
@@ -21,6 +21,7 @@
     "@nestjs/passport": "^11.0.4",
     "@nestjs/platform-fastify": "^11.0.10",
     "bullmq": "^5.34.3",
+    "drizzle-orm": "^0.38.3",
     "fastify": "^5.2.1",
     "ioredis": "^5.4.2",
     "passport": "^0.7.0",
@@ -33,8 +34,10 @@
     "@nestjs/schematics": "^11.0.0",
     "@swc/cli": "^0.8.1",
     "@swc/core": "^1.15.26",
+    "@swc/register": "^0.1.10",
     "@types/node": "^22.10.10",
     "@types/passport-jwt": "^4.0.1",
+    "ts-node": "^10.9.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }
