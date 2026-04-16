@@ -1,0 +1,38 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+.next/
+.turbo/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test
+coverage/
+playwright-report/
+e2e/.auth/
+e2e-logs/
+
+# Sandbox workspaces
+workspaces/
+
+# Eval results
+evals/results/
+
+# Docker
+docker/data/
