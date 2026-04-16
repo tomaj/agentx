@@ -1,149 +1,183 @@
 # Roadmap
 
-Fázy sú incremental. Každá fáza je nasaditeľná.
+Rozdelené na **MVP** (čo najskôr funkčné) a **Post-MVP** fázy.
 
-## Phase 0 — Foundation (aktuálne)
+---
 
-- [x] Dokumentácia (docs/)
-- [x] CLAUDE.md
-- [ ] Monorepo skeleton (pnpm workspaces, turbo.json, tsconfig.base, .env.example)
-- [ ] `docker-compose.yml` s postgres + redis + minio (S3 storage)
-- [ ] Drizzle schema (packages/db) + migrations + pgvector extension
-- [ ] Základné `@agentx/shared` typy a Zod schémy
-- [ ] Docker sandbox base image build (`docker/sandbox.Dockerfile`)
+# MVP — Agent s MCP tools, live timeline
 
-**Exit kritérium:** `pnpm install && pnpm db:migrate` funguje, `docker compose up` spustí PG + Redis + MinIO.
+Cieľ: Vytvorím agenta, pripojím mu MCP tools (napr. Jira, GitHub), spustím ho, a vidím v reálnom čase ako volá tools, dostáva výsledky a iteruje. Ten Jira morning digest use-case musí fungovať.
 
-## Phase 1 — MVP (orgs, seed users, Anthropic only)
+## Čo MVP obsahuje
 
-Cieľ: Prihlásiť sa, vytvoriť agenta, spustiť ho, vidieť timeline.
+- **Login** (seed user + org, fixné heslo)
+- **Agent CRUD** — meno, system prompt, model, MCP bindings
+- **MCP katalóg** — seeded servery (filesystem, http-fetch, github, shell), CRUD v UI
+- **MCP credentials** — user paste-ne static token, uloží sa zašifrovaný
+- **Manual trigger** — kliknem "Run" v UI, zadám JSON input
+- **Agent execution loop** — Claude Agent SDK: LLM → tool calls → MCP → results → LLM → ... → done
+- **Live execution timeline** — SSE streaming, vidím každý LLM request, tool call, tool result, error, completion
+- **Execution history** — zoznam minulých executions per agent
+- **Folder sandbox** — jednoduchý workspace folder per execution (stačí na dev)
 
-- [ ] API skeleton (NestJS): **login** (nie register), users, orgs + org_members, agents CRUD
-- [ ] Web UI: login, org switcher, agents list, agent editor, execution history
-- [ ] Runner: BullMQ consumer, Claude Agent SDK integration, Docker sandbox per execution
-- [ ] `@agentx/agent-core` v1: ClaudeAgentRuntime + event bridge → `execution_events`
-- [ ] **Prompt caching** on by default (system prompt + tool schemas cached)
-- [ ] **Prompt injection defense**: system prompt hardening, input XML-tagging (viď `docs/23-agent-safety.md`)
-- [ ] **Cost governance**: per-execution `maxCostUsd`, per-agent `dailyCostLimitUsd` (viď `docs/27-cost-governance.md`)
-- [ ] **Concurrent execution limits**: per-agent `maxConcurrentExecutions` (viď `docs/28-concurrent-execution.md`)
-- [ ] Manual trigger (run from UI with JSON input)
-- [ ] Live execution viewer (SSE)
-- [ ] Policy layer (org-scoped, role check)
-- [ ] `pnpm db:seed` — default user + org + meta-agent + MCP katalóg
-- [ ] Basic execution list + cost display (viď `docs/30-analytics.md` Phase 1)
+## Čo MVP NEobsahuje
 
-**Exit kritérium:** Seed, login, create agent, run, see timeline with cost.
+- Triggery (HTTP webhook, cron) — Phase 2
+- Chat sessions (multi-turn conversation UI) — Phase 2
+- Agent versioning (agents sú mutable, proste UPDATE) — Phase 3
+- Docker sandbox — Phase 3
+- File uploads / RAG / pgvector — Phase 3
+- Tags, governance, issues, scoring — Phase 4+
+- Structured output — Phase 2
+- Custom inline tools (code editor) — Phase 3
+- Channels (Slack, Email, WhatsApp) — Phase 5
+- Skills, alerts, custom metrics — Phase 5+
+- Prompt caching, cost governance, concurrent limits — pridáme keď budú reálni useri
 
-## Phase 2 — MCP tools + file uploads + RAG
+## MVP DB (8 tabuliek)
 
-Cieľ: Agent používa externé tools a vie pracovať s uploadnutými dokumentmi.
+```
+users, orgs, org_members
+agents (mutable, mcp_bindings JSONB)
+mcp_servers (seeded katalóg)
+mcp_credentials (encrypted tokens)
+executions
+execution_events
+```
 
-- [ ] `@agentx/mcp-registry` + seed builtin servers (filesystem, shell, github, http-fetch)
-- [ ] MCP client loading v runtime, tool call events v timeline
-- [ ] `mcp_servers` + `mcp_credentials` CRUD v UI (static token flow)
-- [ ] Agent MCP bindings v editore
-- [ ] **Tool safety tiers** (safe/write/destructive) per-tool classification (viď `docs/23-agent-safety.md`)
-- [ ] **File upload pipeline**: S3 (MinIO) storage, `agent_files` table, processing jobs (PDF/CSV/images/DOCX) (viď `docs/26-file-handling.md`)
-- [ ] **pgvector embeddings**: `file_chunks` table, embedding generation, HNSW index (viď `docs/29-rag-knowledge-base.md`)
-- [ ] **`knowledge__search` MCP tool**: semantic search over agent's files
-- [ ] File management UI (upload, list, delete, processing status)
+## MVP API (~10 endpointov)
 
-**Exit kritérium:** Agent s `github` MCP vytvorí issue; agent s uploadnutým PDF odpovie na otázku z neho.
+```
+POST /auth/login
+GET  /auth/me
 
-## Phase 3 — Triggery + structured output
+GET  /agents
+POST /agents
+PATCH /agents/:id
+DELETE /agents/:id
 
-Cieľ: HTTP, chat, cron spúšťanie + typované odpovede.
+GET  /mcp/servers                    (katalóg)
+GET  /mcp/credentials
+POST /mcp/credentials               (paste token)
+DELETE /mcp/credentials/:id
 
-- [ ] HTTP trigger + API keys
-- [ ] Chat trigger + chat UI s live viewer
-- [ ] Cron trigger + scheduler
-- [ ] Sync / async HTTP response modes
-- [ ] **Structured output**: per-agent `outputSchema`, `__output` virtual tool, validation + retry (viď `docs/25-structured-output.md`)
-- [ ] **Cron overlap protection** (skip ak predchádzajúci execution beží)
-- [ ] **Webhook burst protection** (per-agent enqueue rate limit)
-- [ ] **Circuit breaker** (3 consecutive expensive failures → auto-disable agent)
+POST /agents/:id/execute             (manual run)
+GET  /executions/:id/events          (SSE stream)
+GET  /executions                     (history)
+```
 
-**Exit kritérium:** Cron agent beží, webhook vracia structured JSON, chat funguje.
+## MVP UI (~5 stránok)
+
+```
+/login
+/agents                              (list + create)
+/agents/:id                          (edit: prompt, model, MCP bindings)
+/agents/:id/execute                  (run s JSON input → redirect na timeline)
+/executions/:id                      (live timeline)
+```
+
+## MVP postup
+
+**Step 1 — Skeleton (teraz)**
+- Monorepo (pnpm + turbo)
+- docker-compose: postgres + redis
+- Drizzle schema (8 tabuliek) + migrations + seed
+- `.env.example`, tsconfig, biome
+
+**Step 2 — API + Runner**
+- NestJS API: auth (login), agents CRUD, MCP catalog/credentials
+- Runner: BullMQ consumer, Claude Agent SDK, MCP client loading, event emitter
+- Execute endpoint → enqueue → runner picks up → loop → events do PG + Redis pub/sub
+- SSE endpoint
+
+**Step 3 — Web UI**
+- Next.js: login, agents list, agent editor (s MCP binding UI), execution trigger, live timeline
+- shadcn default, minimal
+
+**Step 4 — Polish & test**
+- Seed s reálnym use-case (Jira digest agent)
+- Fix bugs, UX polish
+- Vitest unit testy pre agent-core
+
+**MVP exit kritérium:**
+Seed, login, vytvorím "Morning Jira Digest" agenta so system promptom + Jira MCP (static token) + Gmail MCP, spustím ho, vidím v timeline ako volá `jira__list_issues`, dostane výsledky, volá `gmail__send_email`, dokončí. Execution ukazuje cost a trvanie.
+
+---
+
+# Post-MVP Fázy
+
+## Phase 2 — Triggery + chat + structured output
+
+- HTTP trigger + API keys
+- Cron trigger + scheduler
+- Chat trigger + chat UI (multi-turn, sessions, messages)
+- Structured output (outputSchema, `__output` virtual tool)
+- Sync/async HTTP response modes
+
+**Exit:** Cron agent beží automaticky, webhook funguje, chat je plynulý.
+
+## Phase 3 — Versioning + sandbox + files + custom tools
+
+- Agent versioning (immutable rows, is_current, draft → publish)
+- Docker sandbox (default, folder len pre testy)
+- File uploads + RAG (S3/MinIO, pgvector, `knowledge__search` MCP)
+- Custom inline tools (Monaco code editor, JS/TS, sandbox execution)
+- Global secrets UI (org_secrets)
+
+**Exit:** Agent s uploadnutým PDF odpovie na otázku; Docker izoluje agenta.
 
 ## Phase 4 — Meta-agent + evals
 
-Cieľ: Agent Builder + eval framework.
+- Agent Builder (meta-agent, creates agents via chat)
+- Eval framework (code-based + LLM-as-judge)
+- Scenario builder UI (vizuálny turn-by-turn editor)
+- Agent review flow (draft → diff → eval → publish)
+- Conversation flow visualization
 
-- [ ] Internal tools API v `agent-core` (`list_mcp_servers`, `create_agent`, `create_trigger`)
-- [ ] Seed Agent Builder (pinned model snapshot) pri boote
-- [ ] UI: "Talk to Agent Builder" flow
-- [ ] **Eval framework** (`evals/`) — code-based + LLM-as-judge grading (viď `docs/20-llm-evals.md`)
-- [ ] Meta-agent eval suite (vague prompt, clear prompt, tool selection)
-- [ ] Nightly eval CI job
+**Exit:** Vytvorím agenta cez Builder; evals passujú.
 
-**Exit kritérium:** Vytvorím agenta cez Agent Builder; eval suite passuje.
+## Phase 5 — Security + quality + governance
 
-## Phase 5 — OAuth MCP + security hardening
+- OAuth MCP (GitHub, Slack, Gmail)
+- Governance policies (CRUD, runtime enforcement)
+- Issues tracker per agent
+- Execution scoring (sentiment + quality)
+- Tags system (auto-tagging, tag definitions)
+- Cost governance (per-agent daily, per-org monthly budgets)
+- Concurrent execution limits
+- Prompt injection defense (hardened pre webhook exposure)
 
-- [ ] OAuth2 flow (start + callback + token storage)
-- [ ] Token refresh job + advisory lock (race condition protection)
-- [ ] Encryption at rest (libsodium + master key) — migrate existing static tokens
-- [ ] **Output filtering** (PII detection, content moderation pre sync webhook responses)
-- [ ] CSRF, rate limiting, audit log dotiahnutý
-- [ ] **Hybrid RAG search** (vector + full-text s RRF) (viď `docs/29-rag-knowledge-base.md`)
-- [ ] Per-org monthly cost budget + alerting (50%, 80%, 100%)
+## Phase 6 — Channels + skills + production hardening
 
-**Exit kritérium:** GitHub OAuth connected, agent auto-refreshne token, PII filtered z output.
-
-## Phase 6 — Production hardening
-
-- [ ] Docker sandbox resource enforcement (memory, CPU, PIDs)
-- [ ] Network proxy s domain allowlist
-- [ ] Secrets rotation (dual-key support)
-- [ ] Graceful runner shutdown + heartbeat zombie detection
-- [ ] **Agent anomaly monitoring** (unusual tool call patterns → alert)
-- [ ] **External memory MCP** (persistent key-value per agent cez pgvector)
-- [ ] Runner crash recovery finalizácia (at-most-once + manual retry)
-
-**Exit kritérium:** Agent v isolated containeri, zombie detection, anomaly alerts.
+- Channels (Slack, Email, WhatsApp inbound/outbound)
+- Agent Skills (reusable sub-components)
+- Docker sandbox resource enforcement
+- Network proxy, secrets rotation
+- Heartbeat zombie detection
+- External memory MCP
 
 ## Phase 7 — Analytics + observability
 
-- [ ] **Org dashboard** (cost, executions, top agents, failures) (viď `docs/30-analytics.md`)
-- [ ] **Agent detail analytics** (success rate, duration, cost trend, tool distribution)
-- [ ] Materialized views + refresh pipeline
-- [ ] OpenTelemetry exporter do Jaeger / Tempo
-- [ ] **Configurable alert rules** per org
-- [ ] Log retention policy + S3 archive
-- [ ] CSV export
-- [ ] Context usage monitoring (compaction count, peak tokens)
+- Custom metrics (tag-based rules)
+- Alerts (metric-based, severity routing)
+- Org + agent dashboards
+- Agent Builder production analysis
+- OpenTelemetry export
+- CSV export, retention policies
 
-## Phase 8 — Invitations & billing scaffold
+## Phase 8+ — Scale + billing
 
-- [ ] Email pozvánky do orgu + accept flow
-- [ ] Registration UI
-- [ ] Sharing rules pre agentov v orgu (per-role)
-- [ ] Billing scaffolding (usage tracking per org → Stripe integration začne)
-- [ ] **Platform admin dashboard** (cross-org, revenue, system health)
-- [ ] Telemetry opt-in/out enforcement
+- Invitations, registration UI
+- Billing (Stripe)
+- Horizontal runner scaling
+- Platform admin dashboard
+- Marketplace, A/B testing, agent-to-agent calls
 
-## Phase 9 — Scale
+---
 
-- [ ] Horizontal runner (N inštancií, fair queue consumption)
-- [ ] Leader election pre scheduler
-- [ ] Read replicas PG
-- [ ] (maybe) K8s deployment
-- [ ] Dedicated vector DB migration ak >10M chunks (Qdrant/Pinecone)
+# Mimo scope (natrvalo)
 
-## Phase 10+ — Nice-to-have
-
-- Marketplace / template agentov
-- Agent memory (persistent state medzi executions)
-- Agent-to-agent calls (agent spustí druhého ako tool)
-- Agent debugging / fork-from-event replay
-- Multimodal output (generated images, audio)
-- Mobile companion app
-- Streaming responses do webhookov
-- End-user documentation portal
-
-## Mimo scope (natrvalo)
-
-- Cluster vlastnej GPU infra
+- Human-in-the-loop approval (agenti sú plne autonómni)
+- Voice/telephony
 - Training vlastných modelov
 - Vlastný MCP protokol fork
-- Human-in-the-loop approval (design decision: agenti sú plne autonómni)

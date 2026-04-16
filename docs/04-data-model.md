@@ -9,19 +9,29 @@ Postgres + Drizzle. Všetky tabuľky majú `id uuid` (default `gen_random_uuid()
         ├── agents (versioned, immutable rows)
         │      │
         │      ├── triggers ── api_keys
-        │      │
-        │      └── chat_sessions ── messages
+        │      ├── chat_sessions ── messages
+        │      ├── tag_definitions                    ← Phase 3
+        │      ├── custom_tools (versioned)           ← Phase 3
+        │      ├── agent_issues                       ← Phase 5
+        │      └── agent_skills (via params.skillIds) ← Phase 6
         │
-        └── executions ─── execution_events
-               │
-               └── agents.id (snapshot verzia)
+        ├── executions ─── execution_events
+        │      │
+        │      ├── agents.id (snapshot verzia)
+        │      ├── execution_tags ── tag_definitions  ← Phase 3
+        │      ├── execution_scoring                  ← Phase 5
+        │      └── policy_violations ── governance_policies ← Phase 5
+        │
+        └── agent_files ── file_chunks (pgvector)
 
  mcp_servers (katalóg)
  mcp_credentials (per user/org × mcp_server)
+ org_secrets (encrypted, UI-managed)              ← Phase 3
 
  orgs ── org_members ── users
-
- agent_files ── file_chunks (pgvector embeddings)
+ orgs ── governance_policies                      ← Phase 5
+ orgs ── custom_metrics ── alerts ── alert_events ← Phase 7
+ orgs ── channels (slack/email/whatsapp)          ← Phase 6
 
  audit_log
 ```
@@ -344,6 +354,219 @@ PK: `(agent_id, date)`. Aktualizuje sa po každej execution (increment).
 | entity_id | uuid | |
 | metadata | jsonb | |
 
+---
+
+## Tabuľky pridané z Wonderful analýzy
+
+*Tieto tabuľky podporujú features identifikované z competitive analýzy platformy Wonderful.*
+
+### `tag_definitions` (Phase 3)
+
+Per-agent definícia tagov, ktoré sa automaticky aplikujú na executions.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| agent_id | uuid | logický agent |
+| org_id | uuid fk | |
+| name | text | napr. "Plan Inquiry", "Error", "Escalation" |
+| slug | text | URL-safe, unique per agent |
+| color | text null | hex pre UI badge |
+| prompt | text | LLM prompt: "Apply this tag when the execution..." |
+| auto_apply | bool | true = auto-tag post-execution cez Haiku |
+| enabled | bool | |
+
+UNIQUE: `(agent_id, slug)`.
+
+### `execution_tags` (Phase 3)
+
+M:N vzťah medzi executions a tagmi.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| execution_id | uuid fk executions | |
+| tag_definition_id | uuid fk tag_definitions | |
+| confidence | numeric(3,2) null | 0.00-1.00, pre auto-tagged |
+| source | text | `auto` / `manual` |
+| created_at | timestamptz | |
+
+UNIQUE: `(execution_id, tag_definition_id)`.
+
+### `custom_tools` (Phase 3)
+
+Inline kódové tools vytvorené v UI editore (nie MCP).
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| agent_id | uuid | logický agent |
+| org_id | uuid fk | |
+| name | text | tool name pre LLM (napr. `calculate_shipping`) |
+| description | text | popis pre LLM |
+| input_schema | jsonb | JSON Schema pre argumenty |
+| output_schema | jsonb null | |
+| code | text | JS/TS source code |
+| version | int | |
+| is_current | bool | |
+| created_by | uuid fk users null | |
+
+UNIQUE: `(agent_id, name, version)`.
+
+### `org_secrets` (Phase 3)
+
+Platform-level secrets spravované cez UI, injektovateľné do custom tools a agent configs.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| org_id | uuid fk | |
+| key | text | napr. `STRIPE_API_KEY`, `INTERNAL_API_URL` |
+| encrypted_value | bytea | libsodium encrypted |
+| description | text null | |
+| created_by | uuid fk users null | |
+
+UNIQUE: `(org_id, key)`.
+
+### `governance_policies` (Phase 5)
+
+Content moderation a safety policies.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| org_id | uuid fk | |
+| name | text | napr. "Financial Fraud", "Harassment", "PII Detection" |
+| condition | text | popis kedy sa policy aplikuje (pre LLM-based check) |
+| keywords | text[] null | fast-path keyword match pred LLM check |
+| max_hits | int | koľkokrát môže byť triggered pred action |
+| action | text | `flag` / `block` / `alert` |
+| severity | text | `low` / `medium` / `high` / `critical` |
+| enabled | bool | |
+| version | int | |
+
+### `policy_violations` (Phase 5)
+
+Záznamy o violation-och počas executions.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| execution_id | uuid fk | |
+| policy_id | uuid fk governance_policies | |
+| matched_content | text | redacted excerpt |
+| action_taken | text | `flagged` / `blocked` / `alerted` |
+| created_at | timestamptz | |
+
+### `agent_issues` (Phase 5)
+
+Bug/quality tracking per agent.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| agent_id | uuid | logický agent |
+| org_id | uuid fk | |
+| execution_id | uuid fk executions null | link na konkrétnu execution |
+| title | text | |
+| description | text | |
+| category | text | `wrong_answer` / `tool_failure` / `flow_logic` / `prompt_issue` / `other` |
+| severity | text | `low` / `medium` / `high` / `critical` |
+| status | text | `open` / `in_progress` / `resolved` / `wont_fix` |
+| assignee_id | uuid fk users null | |
+| resolved_at | timestamptz null | |
+
+### `execution_scoring` (Phase 5)
+
+Post-execution quality scoring.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| execution_id | uuid fk executions | unique |
+| sentiment | text | `positive` / `neutral` / `negative` |
+| quality_score | int | 0-100 |
+| summary | text | 1-2 sentence LLM-generated summary |
+| scored_by_model | text | napr. `claude-haiku-4-5` |
+| scored_at | timestamptz | |
+
+### `custom_metrics` (Phase 7)
+
+User-defined metriky s tag-based pravidlami.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| agent_id | uuid | logický agent |
+| org_id | uuid fk | |
+| name | text | napr. "Verified User Rate", "Successful Resolution" |
+| description | text | |
+| rules | jsonb | `{ include: [{ tag: "Positive" }], exclude: [{ tag: "Invalid" }] }` |
+
+### `alerts` (Phase 7)
+
+Metric-based alert configurations.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| org_id | uuid fk | |
+| metric_id | uuid fk custom_metrics null | null pre system alerts |
+| name | text | |
+| condition | jsonb | `{ metric: "success_rate", operator: "<", threshold: 0.8, window: "24h" }` |
+| severity | text | `low` / `medium` / `high` / `critical` |
+| notify_channels | jsonb | `{ email: ["admin@acme.com"], slack: "#alerts" }` |
+| enabled | bool | |
+
+### `alert_events` (Phase 7)
+
+Fired alert instances.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| alert_id | uuid fk alerts | |
+| triggered_at | timestamptz | |
+| metric_value | numeric | aktuálna hodnota metriky |
+| resolved_at | timestamptz null | |
+| acknowledged_by | uuid fk users null | |
+
+### `agent_skills` (Phase 6)
+
+Reusable sub-components zdieľané medzi agentmi.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| org_id | uuid fk | |
+| name | text | napr. "Authentication Skill", "Billing Lookup" |
+| description | text | |
+| prompt_fragment | text | system prompt addition |
+| mcp_bindings | jsonb | rovnaká štruktúra ako v `agents` |
+| custom_tool_ids | uuid[] null | refs na `custom_tools` |
+| created_by | uuid fk users null | |
+| version | int | |
+| is_current | bool | |
+
+Agents referencujú skills cez JSONB v `agents.params.skillIds: ["uuid", ...]`.
+
+### `channels` (Phase 6)
+
+Messaging channel integrácie.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| org_id | uuid fk | |
+| type | text | `slack` / `email` / `whatsapp` |
+| name | text | human label |
+| config | jsonb | per-type: `{ botToken, channel }` / `{ smtp, from }` / `{ twilioSid }` |
+| enabled | bool | |
+
+Agent binding na channels cez `agents.params.channelIds: ["uuid", ...]`.
+
+---
+
 ## FK cascades
 
 | Parent → Child | On delete |
@@ -372,3 +595,14 @@ PK: `(agent_id, date)`. Aktualizuje sa po každej execution (increment).
 - `mcp_credentials(owner_type, owner_id, mcp_server_id)`
 - `file_chunks(agent_id)` + HNSW on `embedding`
 - `daily_agent_costs(agent_id, date)`
+- `execution_tags(execution_id)` + `(tag_definition_id)`
+- `tag_definitions(agent_id, slug)` — unique
+- `custom_tools(agent_id, name, version)` — unique
+- `org_secrets(org_id, key)` — unique
+- `governance_policies(org_id, enabled)`
+- `policy_violations(execution_id)`
+- `agent_issues(agent_id, status)`
+- `execution_scoring(execution_id)` — unique
+- `custom_metrics(agent_id)`
+- `alerts(org_id, enabled)`
+- `alert_events(alert_id, triggered_at DESC)`
