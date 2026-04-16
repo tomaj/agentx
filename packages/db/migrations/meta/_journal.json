@@ -8,6 +8,20 @@
       "when": 1776330983553,
       "tag": "0000_ambiguous_thing",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776338633763,
+      "tag": "0001_chief_red_wolf",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776342093953,
+      "tag": "0002_closed_misty_knight",
+      "breakpoints": true
     }
   ]
 }

@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "build": "nest build",
-    "dev": "node --require @swc/register src/main.ts",
+    "dev": "tsx src/main.ts",
     "start": "node dist/main.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "mcp:discover": "tsx src/cli/mcp-discover.ts"
   },
   "dependencies": {
     "@agentx/config": "workspace:*",
@@ -14,6 +15,8 @@
     "@agentx/db": "workspace:*",
     "@agentx/logger": "workspace:*",
     "@agentx/shared": "workspace:*",
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@nestjs/common": "^11.0.10",
     "@nestjs/config": "^4.0.1",
     "@nestjs/core": "^11.0.10",
@@ -21,6 +24,7 @@
     "@nestjs/passport": "^11.0.4",
     "@nestjs/platform-fastify": "^11.0.10",
     "bullmq": "^5.34.3",
+    "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.3",
     "fastify": "^5.2.1",
     "ioredis": "^5.4.2",

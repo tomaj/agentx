@@ -19,6 +19,7 @@ export const mcpServers = pgTable("mcp_servers", {
   safetyTier: text("safety_tier").notNull().default("safe"), // safe | write | destructive
   requiresIsolation: boolean("requires_isolation").notNull().default(false),
   isBuiltin: boolean("is_builtin").notNull().default(false),
+  toolsCatalog: jsonb("tools_catalog").notNull().default(sql`'[]'::jsonb`),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

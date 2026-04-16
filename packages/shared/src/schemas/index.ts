@@ -13,7 +13,9 @@ export { loginSchema, type LoginDto } from "./auth";
 
 export {
   createMcpCredentialSchema,
+  createMcpServerSchema,
   type CreateMcpCredentialDto,
+  type CreateMcpServerDto,
 } from "./mcp";
 
 export {

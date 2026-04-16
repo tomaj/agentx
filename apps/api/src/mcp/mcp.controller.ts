@@ -25,6 +25,13 @@ export class McpController {
     return this.mcpService.listServers();
   }
 
+  @Get("servers/:slug")
+  async getServer(@Param("slug") slug: string) {
+    const server = await this.mcpService.getServerBySlug(slug);
+    if (!server) throw new NotFoundException("MCP server not found");
+    return server;
+  }
+
   @Get("credentials")
   listCredentials(@CurrentActor() actor: Actor) {
     return this.mcpService.listCredentials(actor.userId);

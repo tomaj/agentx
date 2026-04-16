@@ -28,6 +28,7 @@ export {
   updateAgentSchema,
   loginSchema,
   createMcpCredentialSchema,
+  createMcpServerSchema,
   executeAgentSchema,
 } from "./schemas/index";
 export type {
@@ -37,5 +38,6 @@ export type {
   AgentParams,
   LoginDto,
   CreateMcpCredentialDto,
+  CreateMcpServerDto,
   ExecuteAgentDto,
 } from "./schemas/index";

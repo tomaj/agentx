@@ -13,7 +13,8 @@
     "db:migrate": "pnpm --filter @agentx/db migrate",
     "db:seed": "pnpm --filter @agentx/db seed",
     "db:reset": "pnpm --filter @agentx/db reset",
-    "db:studio": "pnpm --filter @agentx/db studio"
+    "db:studio": "pnpm --filter @agentx/db studio",
+    "mcp:discover": "pnpm --filter @agentx/api mcp:discover"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

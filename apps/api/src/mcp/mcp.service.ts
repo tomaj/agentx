@@ -1,7 +1,7 @@
 import { encrypt } from "@agentx/crypto";
-import { type Database, mcpCredentials, mcpServers } from "@agentx/db";
+import { type Database, agents, mcpCredentials, mcpServers } from "@agentx/db";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { DB } from "../database/database.module";
 
 @Injectable()
@@ -55,6 +55,63 @@ export class McpService {
       });
 
     return credential!;
+  }
+
+  async createServer(input: {
+    slug: string;
+    name: string;
+    description?: string;
+    transport?: string;
+    launchConfig?: { command: string; args?: string[]; env?: Record<string, string> };
+    authType?: string;
+    safetyTier?: string;
+  }) {
+    const [server] = await this.db
+      .insert(mcpServers)
+      .values({
+        slug: input.slug,
+        name: input.name,
+        description: input.description ?? "",
+        transport: input.transport ?? "stdio",
+        launchConfig: input.launchConfig ?? { command: "npx", args: [] },
+        authType: input.authType ?? "none",
+        safetyTier: input.safetyTier ?? "safe",
+        isBuiltin: false,
+      })
+      .returning();
+    return server!;
+  }
+
+  async getServerBySlug(slug: string) {
+    const results = await this.db
+      .select()
+      .from(mcpServers)
+      .where(eq(mcpServers.slug, slug))
+      .limit(1);
+    return results[0] ?? null;
+  }
+
+  async getAgentsByMcpServerSlug(slug: string) {
+    return this.db
+      .select({
+        id: agents.id,
+        agentId: agents.agentId,
+        name: agents.name,
+        description: agents.description,
+        status: agents.status,
+        modelId: agents.modelId,
+        updatedAt: agents.updatedAt,
+      })
+      .from(agents)
+      .where(
+        and(
+          eq(agents.isCurrent, true),
+          sql`EXISTS (
+            SELECT 1 FROM jsonb_array_elements(${agents.mcpBindings}) AS b
+            WHERE b->>'mcpServerSlug' = ${slug}
+          )`,
+        ),
+      );
   }
 
   async deleteCredential(credentialId: string, userId: string) {

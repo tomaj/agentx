@@ -1,3 +1,6 @@
+import { config } from "dotenv";
+config({ path: ["../../.env.local", "../../.env"] });
+
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { AppModule } from "./app.module";
@@ -8,6 +11,7 @@ async function bootstrap() {
   app.setGlobalPrefix("api/v1");
   app.enableCors({
     origin: process.env.CORS_ORIGINS?.split(",") ?? ["http://localhost:3000"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
   });
 

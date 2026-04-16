@@ -69,7 +69,15 @@ Zatiaľ sme vo fáze **iba dokumentácia** — žiaden aplikačný kód ešte ni
 
 ## Development status
 
-Momentálne: **dokumentácia only**. Kód začíname až po odsúhlasení dokumentácie.
+Momentálne: **MVP implementácia** — Step 1-3 hotové (skeleton, API+Runner, Web UI).
+
+## UI pravidlá
+
+- **Nikdy nepoužívať natívny `window.confirm()` / `window.alert()`**. Vždy použiť `<ConfirmDialog>` z `@/components/confirm-dialog` pre potvrdenie deštruktívnych akcií (delete, archive, cancel).
+- **Textarea s auto-resize**: Na všetky textarea kde user píše dlhší text (system prompt, descriptions) použiť `<AutoresizeTextarea>` z `@/components/autoresize-textarea`. Žiadne scrollbary vo vstupoch — textarea sa automaticky zväčšuje na výšku podľa obsahu.
+- **Entity ID v URL a API**: V `agents` tabuľke rozlišujeme `id` (UUID riadku/verzie) a `agentId` (logická identita). V URL a API routách **vždy používať `agentId`**, nie `id`. Platí pre všetky versioned entity.
+- **Agent runtime**: Používame `@anthropic-ai/sdk` (Anthropic SDK) s vlastným agentic loopom, NIE Claude Agent SDK.
+- **NestJS DI s tsx**: `tsx` nepodporuje `emitDecoratorMetadata`. Všetky constructor parametre v NestJS providers musia mať explicitný `@Inject(Token)` decorator. Nikdy nespoliehať na implicit type-based injection.
 
 ## Pre agentov pracujúcich v tomto repe
 

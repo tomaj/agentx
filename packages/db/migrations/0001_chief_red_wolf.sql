@@ -1,0 +1,1 @@
+ALTER TABLE "mcp_servers" ADD COLUMN "tools_catalog" jsonb DEFAULT '[]'::jsonb NOT NULL;
