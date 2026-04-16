@@ -2,15 +2,15 @@
 
 import { AutoresizeTextarea } from "@/components/autoresize-textarea";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { CopyButton } from "@/components/copy-button";
 import { createAgent, deleteAgent, listAgents } from "@/lib/api";
 import type { Agent } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export default function AgentsPage() {
   const { token } = useAuth();
-  const router = useRouter();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -158,34 +158,56 @@ export default function AgentsPage() {
             {agents.map((agent) => (
               <div
                 key={agent.agentId}
-                className="bg-card border rounded-lg p-5 shadow-sm hover:shadow-md transition-shadow"
+                className="bg-card border rounded-lg p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col"
               >
-                <button
-                  onClick={() => router.push(`/agents/${agent.agentId}`)}
-                  className="block w-full text-left focus:outline-none focus:ring-2 focus:ring-ring rounded"
+                {/* Clickable top area */}
+                <Link
+                  href={`/agents/${agent.agentId}`}
+                  className="block focus:outline-none focus:ring-2 focus:ring-ring rounded"
                   aria-label={`Open agent ${agent.name}`}
                 >
                   <h3 className="font-medium text-card-foreground truncate">{agent.name}</h3>
-                  <p className="text-xs text-muted-foreground mt-1">{agent.modelId}</p>
-                </button>
-                <div className="flex items-center justify-between mt-4 pt-3 border-t">
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span
-                      className={
-                        agent.status === "active" ? "text-green-600" : "text-muted-foreground"
-                      }
-                    >
-                      {agent.status}
-                    </span>
-                    <span>v{agent.version}</span>
+                  {agent.description && (
+                    <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2">
+                      {agent.description}
+                    </p>
+                  )}
+                </Link>
+
+                {/* Model + Version rows */}
+                <div className="mt-3 space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Model</span>
+                    <span className="text-foreground font-mono text-xs">{agent.modelId}</span>
                   </div>
-                  <button
-                    onClick={() => setDeleteTarget(agent)}
-                    className="text-xs text-muted-foreground hover:text-destructive"
-                    aria-label={`Delete agent ${agent.name}`}
-                  >
-                    Delete
-                  </button>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Version</span>
+                    <span className="text-foreground">{agent.version}</span>
+                  </div>
+                </div>
+
+                {/* Bottom row */}
+                <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                  <CopyButton
+                    text={agent.agentId}
+                    label={`${agent.agentId.slice(0, 8)}...`}
+                    className="font-mono"
+                  />
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setDeleteTarget(agent)}
+                      className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                      aria-label={`Delete agent ${agent.name}`}
+                    >
+                      Delete
+                    </button>
+                    <Link
+                      href={`/agents/${agent.agentId}`}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Details &rarr;
+                    </Link>
+                  </div>
                 </div>
               </div>
             ))}
