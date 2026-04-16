@@ -167,11 +167,9 @@ export default function AgentsPage() {
                   aria-label={`Open agent ${agent.name}`}
                 >
                   <h3 className="font-medium text-card-foreground truncate">{agent.name}</h3>
-                  {agent.description && (
-                    <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2">
-                      {agent.description}
-                    </p>
-                  )}
+                  <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2">
+                    {agent.description || agent.systemPrompt}
+                  </p>
                 </Link>
 
                 {/* Model + Version rows */}
