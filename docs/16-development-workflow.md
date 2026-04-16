@@ -65,6 +65,8 @@ Root `package.json`:
 | `pnpm db:reset` | Drop + recreate + migrate + seed (pre lokál) |
 | `pnpm db:seed` | Seed (idempotent) |
 | `pnpm db:studio` | Drizzle Studio na http://localhost:4983 |
+| `pnpm mcp:discover` | Discover/refresh tools pre všetky MCP servery |
+| `pnpm mcp:discover <slug>` | Discover tools pre konkrétny MCP server |
 
 Per-app scripts (napr. `pnpm --filter @agentx/api dev`).
 
@@ -167,10 +169,35 @@ pnpm --filter @agentx/api dev:debug
 
 ### ... nový MCP server do katalógu
 
-1. Pridaj entry do seed scriptu (`scripts/seed-mcp-catalog.ts`)
-2. Ak má OAuth: pridaj client ID/secret do env + config
-3. Ak stdio: over že command je pre-installed v sandbox image (phase 6)
-4. Re-run seed: `pnpm db:seed`
+**Cez UI (preferovaný spôsob):**
+1. Choď na `/mcp/servers` → klikni "Add server"
+2. Vyplň name, slug, command + args (napr. `npx` + `-y @modelcontextprotocol/server-github`)
+3. Po uložení sa automaticky spustí discovery — aplikácia sa pripojí k serveru a načíta jeho tools
+4. Ak discovery zlyhá (package neexistuje, vyžaduje token), tools sa dajú načítať neskôr cez "Refresh tools" na detail page
+
+**Cez seed (built-in servery):**
+1. Pridaj entry do `packages/db/src/seed.ts` (vrátane `toolsCatalog`)
+2. Re-run seed: `pnpm db:seed`
+
+**Ak má OAuth:** pridaj client ID/secret do env + config.
+**Ak stdio:** over že command je pre-installed v sandbox image (phase 6).
+
+### ... refresh MCP tools catalog
+
+Tools catalog sa dá aktualizovať troma spôsobmi:
+
+1. **UI:** Na detail page MCP servera (`/mcp/servers/<slug>`) klikni "Refresh tools"
+2. **API:** `POST /mcp/servers/<slug>/discover` (vyžaduje auth token)
+3. **CLI:** `pnpm mcp:discover` (všetky) alebo `pnpm mcp:discover <slug>` (jeden)
+
+CLI command je vhodný na **cron** — každú hodinu refreshne tools pre všetky servery:
+
+```bash
+# crontab -e
+0 * * * * cd /path/to/agentx && pnpm mcp:discover >> /var/log/agentx-mcp-discover.log 2>&1
+```
+
+Ako to funguje: spustí MCP server process, zavolá `tools/list` cez MCP protokol, uloží výsledok do DB, zabije process. Ak server zlyhá (chýba package, vyžaduje credentials, timeout 30s), reportne FAIL a pokračuje ďalej.
 
 ### ... novú UI stránku
 
